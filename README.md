@@ -182,7 +182,7 @@ This will load the image nginx in version 1.13-alpine for the reverse proxy and 
 
 This can be run as a single container by creating an image from the Dockerfile and creating a container from that image as done before with the FastAPI Dockerfile
 ```console
-docker built -t myproxyimage .
+docker build -t myproxyimage .
 docker run -d --name myproxycontainer -p 80:80 myproxyimage
 ```
 As there is no service answering on port 8080 only the default page can be seen here.
