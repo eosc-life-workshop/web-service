@@ -126,7 +126,7 @@ The file with the required programs is copied to the folder and used to install 
 Now the folder ```app``` with the files ```__init__.py``` and ```main.py``` is copied to the *working directory*.
 The last line calls the command ```uvicorn app.main:app --host 0.0.0.0 --port 80``` in the container.
 
-Next we need to create an image from the ```Dockerfile```.
+Next we need to create an image from the ```Dockerfile```. Note the dot at the end of this command, indicating the location of the ```Dockerfile```
 ```console
 sudo docker build -t myimage .
 ```
@@ -182,8 +182,8 @@ This will load the image nginx in version 1.13-alpine for the reverse proxy and 
 
 This can be run as a single container by creating an image from the Dockerfile and creating a container from that image as done before with the FastAPI Dockerfile
 ```console
-docker built -t myproxyimage
-docker run -d --name mycontainer -p 80:80 myproxyimage
+docker built -t myproxyimage .
+docker run -d --name myproxycontainer -p 80:80 myproxyimage
 ```
 As there is no service answering on port 8080 only the default page can be seen here.
 
