@@ -144,47 +144,7 @@ sudo docker stop $(sudo docker ps -aq)
 sudo docker rm $(sudo docker ps -aq)
 ```
 
----
-
-# Deploy FastAPI and reverse proxy with docker compose
-
-* Preparation of FastAPI 
-
-We can use the previously created folders and the Dockerfile for the docker compose deployment. 
-
-To use docker compose, create a ```docker-compose.yml``` file in the directory ```~/compose``` and enter the following:
-
-```yml
-version: "3.8"
-services:
-    web-app:
-        build: ./web-app
-        networks:
-            - app-net
-
-networks:
-    app-net:
-        ipam:
-            driver: default
-            config:
-                - subnet: 10.0.32.0/24
-                    ip_range: 10.0.32.0/28
-```
-
-The version is just for reference it is not used to determine the docker version in use. In the section ```services:``` the containers to run are specified. We need to change the existing ```Dockerfile``` for FastAPI so we can use a reverse proxy.
-
-Add the tag ```--proxy-headers``` to the issued command in the last line and change the port to 8080. The new file should look like this:
-```Dockerfile
-FROM python:3.9
-WORKDIR /code
-COPY ./requirements.txt /code/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
-COPY ./app /code/app
-CMD ["uvicorn", "app.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8080"]
-```
-In the ```build:``` tag of each service the folder for the Dockerfile is specified. As the ```docker-compose.yml``` file is located in the directory ```~/compose``` the folder to the Dockerfile is given in accordance to the directory the ```docker-compose.yml``` file is in, indicated by the ```.``` at the beginning. 
-
-In the section ```networks:``` a network is created. We call it ```app-net:``` with the parameter ```ipam:``` we create a subnet for the containers with an usable ip range of 10.0.32.0/28. Select the default driver and an appropriate subnet (Default docker and docker compose networks are in the range of the OpenStack training public2 range and therefore can not be used.)
+# Deploying reverse proxy with docker
 
 * preparation of reverse proxy
 
@@ -208,7 +168,9 @@ server {
 }
 ```
  
-This file will create a simple reverse-proxy that redirects all incoming traffic to the container called compose-app-1 at port 8080 and use some security measures for the connection.
+This file will create a simple reverse-proxy that redirects all incoming traffic to the container called compose-web-app-1 at port 8080 and use some security measures for the connection.
+
+* deploy the reverse proxy with docker
 
 Now create a Dockerfile in  the folder and add the following content:
 ```Dockerfile
@@ -218,14 +180,36 @@ COPY conf /etc/nginx/conf.d/default.conf
 
 This will load the image nginx in version 1.13-alpine for the reverse proxy and copy the previously created ```conf``` file to the container.
 
-This could also be run as a single container by creating an image from the Dockerfile and creating a container from ,that image as done befor with the FastAPI Dockerfile
+This can be run as a single container by creating an image from the Dockerfile and creating a container from that image as done before with the FastAPI Dockerfile
 ```console
 docker built -t myproxyimage
 docker run -d --name mycontainer -p 80:80 myproxyimage
 ```
 As there is no service answering on port 8080 only the default page can be seen here.
 
-Now add the reverse proxy to the ```docker-compose.yml``` file.
+---
+
+# Deploy FastAPI and reverse proxy with docker compose
+
+* Preparation of FastAPI 
+
+We need to change the existing ```Dockerfile``` for FastAPI so we can use a reverse proxy.
+
+Add the tag ```--proxy-headers``` to the issued command in the last line and change the port to ```8080```. The new file should look like this:
+```Dockerfile
+FROM python:3.9
+WORKDIR /code
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+COPY ./app /code/app
+CMD ["uvicorn", "app.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+* prepare docker compose
+
+We can use the previously created folders and both ```Dockerfiles``` for the docker compose deployment. 
+
+To use docker compose, create a ```docker-compose.yml``` file in the directory ```~/compose``` and enter the following:
 
 ```yml
 version: "3.8"
@@ -251,6 +235,12 @@ networks:
           ip_range: 10.0.32.0/28
 
 ```
+
+The version is just for reference it is not used to determine the docker version in use. In the section ```services:``` the containers to run are specified. 
+In the ```build:``` tag of each service the folder for the Dockerfile is specified. As the ```docker-compose.yml``` file is located in the directory ```~/compose``` the folders to the Dockerfile is given in accordance to the directory of the ```docker-compose.yml``` file, indicated by the ```.``` at the beginning. 
+
+In the section ```networks:``` a network is created. We call it ```app-net:``` with the parameter ```ipam:``` we create a subnet for the containers with an usable ip range of 10.0.32.0/28. Select the default driver and an appropriate subnet (Default docker and docker compose networks are in the range of the OpenStack training public2 range and therefore can not be used.)
+
 This will create two containers from the two folders which we just created. For each container the corresponding ```Dockerfile``` will be used. Note, that only the container for the reverse proxy does have any attached ports. This way the reverse proxy is reachable from the outside, but FastAPI is not.
 
 Start the containers with the following command:
