@@ -127,7 +127,7 @@ The last line calls the command ```uvicorn app.main:app --host 0.0.0.0 --port 80
 
 Next we need to create an image from the ```Dockerfile```.
 ```console
-docker built -t myimage
+docker build -t myimage
 ```
 
 When the image build is done we can start a container using this image.
