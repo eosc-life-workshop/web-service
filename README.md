@@ -55,28 +55,29 @@ sudo systemctl restart docker
 For the sake of clarity we will use separate folders for the app and the reverse proxy. Create a main folder in you home directory an two sub folders in the main folder:
 
 ```console
-mkdir -p ~/compose/{app,proxy}
+mkdir -p ~/compose/{web-app,proxy}
 ```
 
 # Deploying FastAPI with docker
 
 * prepare FastAPI
  
-To deploy FastAPI with docker we firstly must create all needed files for FastAPI in the directory ```~/compose/app/```. This includes the python files and a text file with the required apps from pip for FastAPI.
+To deploy FastAPI with docker we firstly must create all needed files for FastAPI in the directory ```~/compose/web-app/```. This includes the python files and a text file with the required apps from pip for FastAPI.
 
-Change the directory to ```~/compose/app```:
-
-```console
-cd ~/compose/app
-```
-
-Write an empty python file called ```~/compose/app/__init__.py```.
+First create another directory ```~/compose/web-app/app``` and change to it:
 
 ```console
-touch ~/compose/app/__init__.py
+mkdir ~/compose/web-app/app
+cd ~/compose/web-app/app
 ```
 
-Than create another file ```~/compose/app/main.py``` with the following content:
+Write an empty python file called ```~/compose/web-app/app/__init__.py```.
+
+```console
+touch ~/compose/web-app/app/__init__.py
+```
+
+Than create another file ```~/compose/web-app/app/main.py``` with the following content:
 
 ```python
 from typing import Union
@@ -98,7 +99,7 @@ def read_item(item_id: int, q: Union[str, None] = None):
 
 This will import the fastapi python module and use it to create a new object called ```app```. When the root directory is been called the key value pair ```"Hello": "World``` should be given back. The items can be called with the ```item_id```. 
 
-Now create a file with the dependencies for the app you want to use. In this case we need three apps from pip. Create the file ```~/compose/app/requirements.txt```:
+Now create a file with the dependencies for the app you want to use. In this case we need three apps from pip. Create the file ```~/compose/web-app/requirements.txt```:
 
 ```text
 fastapi>=0.68.0,<0.69.0
@@ -109,7 +110,7 @@ This file will be used later to install all necessary program for the app. The n
 
 * Deploy the app with docker
 
-To deploy FastAPI with docker we need a ```Dockerfile``` in the folder ```~/compose/app/```. 
+To deploy FastAPI with docker we need a ```Dockerfile``` in the folder ```~/compose/web-app/```. 
 
 ```Dockerfile
 FROM python:3.9
@@ -127,20 +128,20 @@ The last line calls the command ```uvicorn app.main:app --host 0.0.0.0 --port 80
 
 Next we need to create an image from the ```Dockerfile```.
 ```console
-docker build -t myimage
+sudo docker build -t myimage .
 ```
 
 When the image build is done we can start a container using this image.
 ```console
-docker run -d --name mycontainer -p 80:80 myimage
+sudo docker run -d --name mycontainer -p 80:80 myimage
 ```
 
 The content can be checked with a web browser by using the external IP of the machine an d port 80.
 To terminate all containers use the following command:
 
 ```console
-docker stop $(docker ps -aq)
-docker rm $(docker ps -aq)
+sudo docker stop $(docker ps -aq)
+sudo docker rm $(docker ps -aq)
 ```
 
 ---
