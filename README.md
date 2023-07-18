@@ -140,8 +140,8 @@ The content can be checked with a web browser by using the external IP of the ma
 To terminate all containers use the following command:
 
 ```console
-sudo docker stop $(docker ps -aq)
-sudo docker rm $(docker ps -aq)
+sudo docker stop $(sudo docker ps -aq)
+sudo docker rm $(sudo docker ps -aq)
 ```
 
 ---
@@ -158,7 +158,7 @@ To use docker compose, create a ```docker-compose.yml``` file in the directory `
 version: "3.8"
 services:
     web-app:
-        build: ./app
+        build: ./web-app
         networks:
             - app-net
 
@@ -199,7 +199,7 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-NginX-Proxy true;
-    proxy_pass http://compose-app-1:8080;
+    proxy_pass http://compose-web-app-1:8080;
     proxy_ssl_session_reuse off;
     proxy_set_header Host $http_host;
     proxy_cache_bypass $http_upgrade;
@@ -220,8 +220,8 @@ This will load the image nginx in version 1.13-alpine for the reverse proxy and 
 
 This could also be run as a single container by creating an image from the Dockerfile and creating a container from ,that image as done befor with the FastAPI Dockerfile
 ```console
-docker built -t myimage
-docker run -d --name mycontainer -p 80:80 myimage
+docker built -t myproxyimage
+docker run -d --name mycontainer -p 80:80 myproxyimage
 ```
 As there is no service answering on port 8080 only the default page can be seen here.
 
@@ -230,8 +230,8 @@ Now add the reverse proxy to the ```docker-compose.yml``` file.
 ```yml
 version: "3.8"
 services:
-  app:
-    build: ./app
+  web-app:
+    build: ./web-app
     networks:
       - app-net
   proxy:
