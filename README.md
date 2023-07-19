@@ -50,6 +50,8 @@ sudo systemctl daemon-reload
 sudo systemctl restart docker
 ```
 
+# Deploying FastAPI with docker
+
 * Create directory structure
 
 For the sake of clarity we will use separate folders for the app and the reverse proxy. Create a main folder in you home directory an two sub folders in the main folder:
@@ -57,8 +59,6 @@ For the sake of clarity we will use separate folders for the app and the reverse
 ```console
 mkdir -p ~/compose/{web-app,proxy}
 ```
-
-# Deploying FastAPI with docker
 
 * prepare FastAPI
  
