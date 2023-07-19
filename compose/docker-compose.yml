@@ -1,7 +1,9 @@
 version: "3.8"
 services:
-  app:
-    build: ./app
+  web-app:
+    build: ./web-app
+    environment:
+      HOST_NAME: $HOSTNAME
     networks:
       - app-net
   proxy:

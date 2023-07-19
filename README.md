@@ -30,7 +30,7 @@ sudo usermod -aG docker ubuntu
 
 * setup mtu and internal network in docker
 
-By default docker uses a larger mtu size then OpenStack. The internal network 172.17.0.0/16 can interfere with other networks in use. To change the mtu size and default network (this can be any private network not already in use) create the file ```/etc/docker/daemon.json``` with permissions 644 and add the following:
+By default docker uses a larger mtu size then OpenStack. The internal network 172.17.0.0/16 can interfere with other networks in use. To change the mtu size and default network (this can be any private network not already in use) create the file ```/etc/docker/daemon.json``` with permissions 644.
 
 ```console
 echo '{
@@ -83,7 +83,11 @@ from typing import Union
 
 from fastapi import FastAPI
 
-app = FastAPI()
+import os
+
+hostname = os.environ['HOST_NAME']
+
+app = FastAPI(root_path="/p/"+hostname+"/80")
 
 
 @app.get("/")
@@ -96,7 +100,14 @@ def read_item(item_id: int, q: Union[str, None] = None):
     return {"item_id": item_id, "q": q}
 ```
 
-This will import the fastapi python module and use it to create a new object called ```app```. When the root directory is been called the key value pair ```"Hello": "World``` should be given back. The items can be called with the ```item_id```. 
+
+This will import the fastapi python module and use it to create a new object called ```app```. In this environment we need to use the host name of the vm to reach the API with the browser. Therefor the root directory is set to a value build with the hostname from the vm. To use the environmental variable it needs to be exported:
+
+```console
+export HOSTNAME
+```
+
+When the root directory is called the key value pair ```"Hello": "World``` should be given back. The items can be called with the ```item_id```. 
 
 Now create a file with the dependencies for the app you want to use. In this case we need three apps from pip. Create the file ```~/compose/web-app/requirements.txt```:
 
@@ -114,6 +125,7 @@ To deploy FastAPI with docker we need a ```Dockerfile``` in the folder ```~/comp
 ```Dockerfile
 FROM python:3.9
 WORKDIR /code
+ENV HOST_NAME $HOSTNAME
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY ./app /code/app
@@ -194,7 +206,7 @@ As there is no service answering on port 8080 only the default page can be seen 
 
 We need to change the existing ```Dockerfile``` for FastAPI so we can use a reverse proxy.
 
-Add the tag ```--proxy-headers``` to the issued command in the last line and change the port to ```8080```. The new file should look like this:
+Add the tag ```--proxy-headers``` to the issued command in the last line and change the port to ```8080```. Remove the ```ENV``` tag and the variables as we will use the ```docker-compose.yml``` for this. The new file should look like this:
 ```Dockerfile
 FROM python:3.9
 WORKDIR /code
@@ -215,6 +227,8 @@ version: "3.8"
 services:
   web-app:
     build: ./web-app
+    environment:
+      HOST_NAME: $HOSTNAME
     networks:
       - app-net
   proxy:
@@ -238,13 +252,19 @@ networks:
 The version is just for reference it is not used to determine the docker version in use. In the section ```services:``` the containers to run are specified. 
 In the ```build:``` tag of each service the folder for the Dockerfile is specified. As the ```docker-compose.yml``` file is located in the directory ```~/compose``` the folders to the Dockerfile is given in accordance to the directory of the ```docker-compose.yml``` file, indicated by the ```.``` at the beginning. 
 
-In the section ```networks:``` a network is created. We call it ```app-net:``` with the parameter ```ipam:``` we create a subnet for the containers with an usable ip range of 10.0.32.0/28. Select the default driver and an appropriate subnet (Default docker and docker compose networks are in the range of the OpenStack training public2 range and therefore can not be used.)
+In the section ```environment``` the variable for the vm host name is passed to the container. In the section ```networks:``` a network is created. We call it ```app-net:``` with the parameter ```ipam:``` we create a subnet for the containers with an usable ip range of 10.0.32.0/28. Select the default driver and an appropriate subnet (Default docker and docker compose networks are in the range of the OpenStack training public2 range and therefore can not be used.)
 
 This will create two containers from the two folders which we just created. For each container the corresponding ```Dockerfile``` will be used. Note, that only the container for the reverse proxy does have any attached ports. This way the reverse proxy is reachable from the outside, but FastAPI is not.
 
-Start the containers with the following command:
+To use the environmental variable export it:
+
+```console
+export HOSTNAME
 ```
-$ docker compose up
+
+Then start the containers with the following command:
+```
+docker compose up
 ```
 
 Use your browser again to reach the IP of the vm and you should see the FastAPI page.

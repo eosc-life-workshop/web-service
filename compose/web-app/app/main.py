@@ -2,7 +2,11 @@ from typing import Union
 
 from fastapi import FastAPI
 
-app = FastAPI()
+import os
+
+hostname = os.environ['HOST_NAME']
+
+app = FastAPI(root_path="/p/"+hostname+"/80")
 
 
 @app.get("/")
