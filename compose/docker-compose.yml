@@ -13,6 +13,7 @@ services:
       - 443:443
     networks:
       - app-net
+      - dmz-net
 
 networks:
   app-net:
@@ -21,3 +22,9 @@ networks:
       config:
         - subnet: 10.0.32.0/24
           ip_range: 10.0.32.0/28
+  dmz-net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.33.0/24
+          ip_range: 10.0.33.0/28
