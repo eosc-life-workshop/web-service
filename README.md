@@ -32,11 +32,11 @@ sudo usermod -aG docker ubuntu
 
 By default docker uses a larger mtu size then OpenStack. The internal network 172.17.0.0/16 can interfere with other networks in use. To change the mtu size and default network (this can be any private network not already in use) create the file ```/etc/docker/daemon.json``` with permissions 644 and add the following:
 
-```json
-{
+```console
+echo '{
    "bip":"192.168.140.1/24",
    "mtu":1440
-}
+}' | sudo tee /etc/docker/daemon.json
 ```
 
 To change the permissions:
@@ -64,11 +64,10 @@ mkdir -p ~/compose/{web-app,proxy}
  
 To deploy FastAPI with docker we firstly must create all needed files for FastAPI in the directory ```~/compose/web-app/```. This includes the python files and a text file with the required apps from pip for FastAPI.
 
-First create another directory ```~/compose/web-app/app``` and change to it:
+First create another directory ```~/compose/web-app/app```:
 
 ```console
 mkdir ~/compose/web-app/app
-cd ~/compose/web-app/app
 ```
 
 Write an empty python file called ```~/compose/web-app/app/__init__.py```.
@@ -110,7 +109,7 @@ This file will be used later to install all necessary program for the app. The n
 
 * Deploy the app with docker
 
-To deploy FastAPI with docker we need a ```Dockerfile``` in the folder ```~/compose/web-app/```. 
+To deploy FastAPI with docker we need a ```Dockerfile``` in the folder ```~/compose/web-app/Dockerfile```. 
 
 ```Dockerfile
 FROM python:3.9
@@ -150,7 +149,7 @@ sudo docker rm $(sudo docker ps -aq)
 
 As reverse proxy we are using nginx. To use nginx we need to create a Dockerfile for the container and a config file for the reverse proxy.
 
-Go to the directory ```~/compose/proxy/``` and create a file ```~/compose/proxy/conf``` with the following content:
+Create the file ```~/compose/proxy/conf``` with the following content:
 ```conf
 server {
   listen 80;
@@ -209,7 +208,7 @@ CMD ["uvicorn", "app.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port"
 
 We can use the previously created folders and both ```Dockerfiles``` for the docker compose deployment. 
 
-To use docker compose, create a ```docker-compose.yml``` file in the directory ```~/compose``` and enter the following:
+To use docker compose, create a ```docker-compose.yml``` file in the directory ```~/compose/docker-compose.yml``` and enter the following:
 
 ```yml
 version: "3.8"
