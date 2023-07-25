@@ -4,7 +4,11 @@ In this workshop, we will focus on how to containerize an application and deploy
 
 # Preparation
 
+We will setup two vms, one for the web service and one for the reverse proxy. They will communicate over one network, and the web service will be reachable through the reverse-proxy. In each step it is mentioned for with vm this step applies. Some steps must be taken for both, this will also be stated.
+
 ## Docker and docker compose
+
+Necessary for both vms:
 
 * add docker repository
 
@@ -52,22 +56,15 @@ sudo systemctl restart docker
 
 # Deploying FastAPI with docker
 
-* Create directory structure
-
-For the sake of clarity we will use separate folders for the app and the reverse proxy. Create a main folder in you home directory an two sub folders in the main folder:
-
-```console
-mkdir -p ~/compose/{web-app,proxy}
-```
+For vm docker-app
 
 * prepare FastAPI
  
-To deploy FastAPI with docker we firstly must create all needed files for FastAPI in the directory ```~/compose/web-app/```. This includes the python files and a text file with the required apps from pip for FastAPI.
+To deploy FastAPI with docker we firstly must create all needed directories and files for FastAPI. This includes the python files and a text file with the required apps from pip for FastAPI.
 
-First create another directory ```~/compose/web-app/app```:
-
+Create the directories and child folders.
 ```console
-mkdir ~/compose/web-app/app
+mkdir -p ~/compose/web-app/app
 ```
 
 Write an empty python file called ```~/compose/web-app/app/__init__.py```.
@@ -100,7 +97,6 @@ def read_item(item_id: int, q: Union[str, None] = None):
     return {"item_id": item_id, "q": q}
 ```
 
-
 This will import the fastapi python module and use it to create a new object called ```app```. In this environment we need to use the host name of the vm to reach the API with the browser. Therefor the root directory is set to a value build with the hostname from the vm. To use the environmental variable it needs to be exported:
 
 ```console
@@ -125,7 +121,6 @@ To deploy FastAPI with docker we need a ```Dockerfile``` in the folder ```~/comp
 ```Dockerfile
 FROM python:3.9
 WORKDIR /code
-ENV HOST_NAME $HOSTNAME
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY ./app /code/app
@@ -137,29 +132,37 @@ The file with the required programs is copied to the folder and used to install 
 Now the folder ```app``` with the files ```__init__.py``` and ```main.py``` is copied to the *working directory*.
 The last line calls the command ```uvicorn app.main:app --host 0.0.0.0 --port 80``` in the container.
 
-Next we need to create an image from the ```Dockerfile```. Note the dot at the end of this command, indicating the location of the ```Dockerfile```
+Next we need to create an image from the ```Dockerfile```. Note the path at the end of this command, indicating the location of the ```Dockerfile```
 ```console
-sudo docker build -t myimage .
+sudo docker build -t myimage compose/web-app/
 ```
 
-When the image build is done we can start a container using this image.
+When the image build is done we can start a container using this image and a environmental variable used in the ```~compose/web-app/app/main.py``` file.
 ```console
-sudo docker run -d --name mycontainer -p 80:80 myimage
+sudo docker run -e HOST_NAME=$HOSTNAME -d --name mycontainer -p 80:80 myimage
 ```
 
 The content can be checked with a web browser by using the external IP of the machine an d port 80.
-To terminate all containers use the following command:
+To terminate the container and delete the image use the following commands:
 
 ```console
-sudo docker stop $(sudo docker ps -aq)
-sudo docker rm $(sudo docker ps -aq)
+sudo docker stop mycontainer
+sudo docker rm mycontainer
+sudo docker rmi myimage
 ```
 
 # Deploying reverse proxy with docker
 
+For vm docker-nginx
+
 * preparation of reverse proxy
 
-As reverse proxy we are using nginx. To use nginx we need to create a Dockerfile for the container and a config file for the reverse proxy.
+To deploy the reverse-proxy with docker we firstly must create the directories and the config file for nginx.
+
+Create the directories and child folders.
+```console
+mkdir -p ~/compose/proxy
+```
 
 Create the file ```~/compose/proxy/conf``` with the following content:
 ```conf
@@ -170,7 +173,7 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-NginX-Proxy true;
-    proxy_pass http://compose-web-app-1:8080;
+    proxy_pass http://<ip_from_docker-app>:8080;
     proxy_ssl_session_reuse off;
     proxy_set_header Host $http_host;
     proxy_cache_bypass $http_upgrade;
@@ -179,11 +182,11 @@ server {
 }
 ```
  
-This file will create a simple reverse-proxy that redirects all incoming traffic to the container called compose-web-app-1 at port 8080 and use some security measures for the connection.
+This file will be used for a simple reverse-proxy that redirects all incoming traffic to the ip of the web-service vm at port 8080 and use some security measures for the connection. Fill in the ip of your ```docker-app``` vm.
 
 * deploy the reverse proxy with docker
 
-Now create a Dockerfile in  the folder and add the following content:
+Now create a Dockerfile in ```~/compose/proxy/Dockerfile``` and add the following content:
 ```Dockerfile
 FROM nginx:1.13-alpine
 COPY conf /etc/nginx/conf.d/default.conf
@@ -191,22 +194,16 @@ COPY conf /etc/nginx/conf.d/default.conf
 
 This will load the image nginx in version 1.13-alpine for the reverse proxy and copy the previously created ```conf``` file to the container.
 
-This can be run as a single container by creating an image from the Dockerfile and creating a container from that image as done before with the FastAPI Dockerfile
-```console
-docker build -t myproxyimage .
-docker run -d --name myproxycontainer -p 80:80 myproxyimage
-```
-As there is no service answering on port 8080 only the default page can be seen here.
 
----
+# Deploy FastAPI with docker compose
 
-# Deploy FastAPI and reverse proxy with docker compose
+For vm docker-app
 
 * Preparation of FastAPI 
 
-We need to change the existing ```Dockerfile``` for FastAPI so we can use a reverse proxy.
+We need to change the existing ```~/compose/web-app/Dockerfile``` for FastAPI so we can use a reverse proxy.
 
-Add the tag ```--proxy-headers``` to the issued command in the last line and change the port to ```8080```. Remove the ```ENV``` tag and the variables as we will use the ```docker-compose.yml``` for this. The new file should look like this:
+Add the tag ```--proxy-headers``` to the issued command in the last line and change the port to ```8080```. The new file should look like this:
 ```Dockerfile
 FROM python:3.9
 WORKDIR /code
@@ -216,7 +213,32 @@ COPY ./app /code/app
 CMD ["uvicorn", "app.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8080"]
 ```
 
-* prepare docker compose
+To use the port 8080 with FastAPI we also need to change the ```~/compose/web-app/app/main.py``` file to use the changed url as root path. You need to change the creator for the FastAPI app in the file and edit the root path to ```"/p/+hostname+"/8080"``` 
+
+```python
+from typing import Union
+
+from fastapi import FastAPI
+
+import os
+
+hostname = os.environ['HOST_NAME']
+
+app = FastAPI(root_path="/p/"+hostname+"/8080")
+
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int, q: Union[str, None] = None):
+    return {"item_id": item_id, "q": q}
+```
+
+
+* prepare docker compose for FastAPI
 
 We can use the previously created folders and both ```Dockerfiles``` for the docker compose deployment. 
 
@@ -227,26 +249,9 @@ version: "3.8"
 services:
   web-app:
     build: ./web-app
+    network_mode: "host"
     environment:
       HOST_NAME: $HOSTNAME
-    networks:
-      - app-net
-  proxy:
-    build: ./proxy
-    ports:
-      - 80:80
-      - 443:443
-    networks:
-      - app-net
-
-networks:
-  app-net:
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.0.32.0/24
-          ip_range: 10.0.32.0/28
-
 ```
 
 The version is just for reference it is not used to determine the docker version in use. In the section ```services:``` the containers to run are specified. 
@@ -254,7 +259,7 @@ In the ```build:``` tag of each service the folder for the Dockerfile is specifi
 
 In the section ```environment``` the variable for the vm host name is passed to the container. In the section ```networks:``` a network is created. We call it ```app-net:``` with the parameter ```ipam:``` we create a subnet for the containers with an usable ip range of 10.0.32.0/28. Select the default driver and an appropriate subnet (Default docker and docker compose networks are in the range of the OpenStack training public2 range and therefore can not be used.)
 
-This will create two containers from the two folders which we just created. For each container the corresponding ```Dockerfile``` will be used. Note, that only the container for the reverse proxy does have any attached ports. This way the reverse proxy is reachable from the outside, but FastAPI is not.
+This will create one container from the folder ```~compose/web-app/``` which we just created. For the container the corresponding ```Dockerfile``` will be used. 
 
 To use the environmental variable export it:
 
@@ -262,9 +267,36 @@ To use the environmental variable export it:
 export HOSTNAME
 ```
 
+To start the container change to directory in which the ```~/compose/docker-compose.yml``` is located and run the following command:
+```console
+docker compose up
+```
+
+# Deploy reverse proxy with docker compose
+
+For vm docker-nginx
+
+* prepare docker compose for nginx
+
+We can use the previously created folders and both ```Dockerfiles``` for the docker compose deployment. 
+
+To use docker compose, create the file ```~/compose/docker-compose.yml``` and enter the following:
+
+```yml
+version: "3.8"
+services:
+  proxy:
+    build: ./proxy
+    network_mode: "host"
+```
+
 Then start the containers with the following command:
 ```
 docker compose up
 ```
 
-Use your browser again to reach the IP of the vm and you should see the FastAPI page.
+Use your browser to reach the IP of the vm and you should see the FastAPI page.
+
+## Connect the vms
+
+Both services should be ready to use, as the web-service is listening on the host port 8080 and the reverse-proxy is forwarding all requests to the web-service on port 8080.
