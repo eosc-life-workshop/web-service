@@ -1,0 +1,7 @@
+version: "3.8"
+services:
+  web-app:
+    build: ./web-app
+    network_mode: "host"
+    environment:
+      HOST_NAME: $HOSTNAME
